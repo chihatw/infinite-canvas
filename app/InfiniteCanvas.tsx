@@ -47,8 +47,44 @@ export default function InfiniteCanvas() {
 
     const render = () => {
       const node = nodeRef.current;
+      const { width, height } = canvas;
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, width, height);
+
+      const gridSize = 200;
+
+      const worldLeft = camera.x - width / 2 / camera.scale;
+      const worldRight = camera.x + width / 2 / camera.scale;
+      const worldTop = camera.y - height / 2 / camera.scale;
+      const worldBottom = camera.y + height / 2 / camera.scale;
+
+      // 最初のグリッド線位置を計算（worldLeft 以上の最初の倍数）
+      const firstGridX = Math.floor(worldLeft / gridSize) * gridSize;
+      const firstGridY = Math.floor(worldTop / gridSize) * gridSize;
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)'; // 薄い格子
+      ctx.lineWidth = 1;
+
+      // 縦線
+      for (let x = firstGridX; x <= worldRight; x += gridSize) {
+        const sx = (x - camera.x) * camera.scale + width / 2;
+        ctx.beginPath();
+        ctx.moveTo(sx, 0);
+        ctx.lineTo(sx, height);
+        ctx.stroke();
+      }
+
+      // 横線
+      for (let y = firstGridY; y <= worldBottom; y += gridSize) {
+        const sy = (y - camera.y) * camera.scale + height / 2;
+        ctx.beginPath();
+        ctx.moveTo(0, sy);
+        ctx.lineTo(width, sy);
+        ctx.stroke();
+      }
+
+      ctx.restore();
 
       const p = worldToScreen(node.x, node.y);
 
