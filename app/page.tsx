@@ -39,7 +39,7 @@ export default function Page() {
       if (e.button !== 0) return; // 左クリックのみ
       isPanning = true;
       lastPointerPos = new Vec2(e.clientX, e.clientY);
-      canvas.setPointerCapture(e.pointerId);
+      canvas.setPointerCapture(e.pointerId); // ドラッグ中にポインターが要素外に出ても関係を切断しない
     };
 
     const handlePointerMove = (e: PointerEvent) => {
@@ -49,14 +49,13 @@ export default function Page() {
       lastPointerPos = current;
 
       engine.panByScreenDelta(deltaScreen);
-      engine.draw();
     };
 
     const handlePointerUp = (e: PointerEvent) => {
       if (e.button !== 0) return;
       isPanning = false;
       lastPointerPos = null;
-      canvas.releasePointerCapture(e.pointerId);
+      canvas.releasePointerCapture(e.pointerId); // ポインターと要素の関係を切断
     };
 
     const handlePointerLeave = () => {
@@ -73,7 +72,6 @@ export default function Page() {
 
       const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
       engine.zoomAtScreenPoint(localPoint, zoomFactor);
-      engine.draw();
     };
 
     canvas.addEventListener('pointerdown', handlePointerDown);
@@ -82,6 +80,15 @@ export default function Page() {
     canvas.addEventListener('pointerleave', handlePointerLeave);
     canvas.addEventListener('wheel', handleWheel, { passive: false });
 
+    // ===== rAF 描画ループ =====
+    let frameId: number;
+
+    const loop = () => {
+      engine.drawFrame();
+      frameId = requestAnimationFrame(loop);
+    };
+    frameId = requestAnimationFrame(loop);
+
     return () => {
       window.removeEventListener('resize', handleResize);
       canvas.removeEventListener('pointerdown', handlePointerDown);
@@ -89,6 +96,7 @@ export default function Page() {
       canvas.removeEventListener('pointerup', handlePointerUp);
       canvas.removeEventListener('pointerleave', handlePointerLeave);
       canvas.removeEventListener('wheel', handleWheel);
+      cancelAnimationFrame(frameId);
     };
   }, []);
 

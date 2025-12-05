@@ -74,6 +74,7 @@ export class CanvasEngine {
   private minScale = 0.25;
   private maxScale = 4;
 
+  private needsDraw = true; // 描画用のフラッグ。状態変化の時に true。描画後 false
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
@@ -99,27 +100,32 @@ export class CanvasEngine {
    */
   setNodes(nodes: NodeEllipse[]) {
     this.nodeLayer.setNodes(nodes);
+    this.requestDraw();
   }
 
   addNode(node: NodeEllipse) {
     this.nodeLayer.addNode(node);
+    this.requestDraw();
   }
 
   // 必要になったら薄い委譲メソッドを増やす
   moveNode(id: string, deltaWorld: Vec2) {
     this.nodeLayer.moveNode(id, deltaWorld);
+    this.requestDraw();
   }
 
   resizeNode(id: string, newRadius: Vec2) {
     this.nodeLayer.resizeNode(id, newRadius);
+    this.requestDraw();
   }
 
   setNodeLabel(id: string, label: string) {
     this.nodeLayer.setLabel(id, label);
+    this.requestDraw();
   }
 
   /**
-   * Canvas のピクセルサイズを、CSS サイズ + devicePixelRatio に合わせて更新する。
+   * Canvas の内部ピクセルサイズを、CSS サイズ + devicePixelRatio に合わせて更新する。
    */
   resize() {
     const canvasDisplaySize = getCanvasDisplaySize(this.canvas);
@@ -130,7 +136,7 @@ export class CanvasEngine {
     // 描画時に、ディスプレイ上の座標を拡大した内部サイズに変換するルールを ctx に設定
     applyDisplayToInternalPixelTransform(this.ctx, this.dpr);
 
-    this.draw();
+    this.requestDraw();
   }
 
   /**
@@ -142,6 +148,7 @@ export class CanvasEngine {
     const worldDelta = delta.scale(1 / this.camera.scale);
     // 画面をドラッグした方向と逆向きにカメラを動かす
     this.camera.position = this.camera.position.sub(worldDelta);
+    this.requestDraw();
   }
 
   /**
@@ -175,12 +182,19 @@ export class CanvasEngine {
     // カメラ位置を補正する
     const correction = before.sub(after);
     this.camera.position = this.camera.position.add(correction);
+
+    this.requestDraw();
   }
 
-  /**
-   * 画面全体を描画し直す。
-   */
-  draw() {
+  requestDraw() {
+    this.needsDraw = true;
+  }
+
+  // 画面全体を描画
+  drawFrame() {
+    if (!this.needsDraw) return;
+    this.needsDraw = false;
+
     const canvasDisplaySize = getCanvasDisplaySize(this.canvas);
     clearCanvas(this.ctx, canvasDisplaySize);
     drawBackground(this.ctx, canvasDisplaySize, '#e5e7eb'); // gray-200
