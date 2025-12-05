@@ -56,6 +56,10 @@ function drawBackground(
   ctx.restore();
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 export class CanvasEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -143,40 +147,35 @@ export class CanvasEngine {
    * 画面座標系でのパン（ドラッグ）量から、カメラ位置を更新する。
    * delta は「画面座標でどれだけ動いたか」。
    */
-  panByScreenDelta(delta: Vec2) {
+  panByScreenDelta(screenDelta: Vec2) {
     // 画面座標の移動量を世界座標の移動量に変換
-    const worldDelta = delta.scale(1 / this.camera.scale);
+    const worldDelta = screenDelta.scale(1 / this.camera.scale);
     // 画面をドラッグした方向と逆向きにカメラを動かす
     this.camera.position = this.camera.position.sub(worldDelta);
     this.requestDraw();
   }
 
   /**
-   * ある画面座標を中心にズームイン・アウトする。
-   * screenPoint: canvas 内の座標 (0,0)〜(width,height)。
-   * zoomFactor: >1 でズームイン、<1 でズームアウト。
+   * 指定した画面座標（canvas 内座標）を中心にズームする。
+   * zoomFactor: 拡大率。>1 で拡大、<1 で縮小。
    */
   zoomAtScreenPoint(screenPoint: Vec2, zoomFactor: number) {
     const canvasDisplaySize = getCanvasDisplaySize(this.canvas);
-    const before = screenToWorld(
-      screenPoint,
-      canvasDisplaySize,
-      this.camera.position,
-      this.camera.scale
-    );
 
-    const newScale = Math.min(
-      this.maxScale,
-      Math.max(this.minScale, this.camera.scale * zoomFactor)
+    // 共通引数をあらかじめ渡したローカルラッパー関数
+    const screenToWorldLocal = (vec: Vec2, scale: number) =>
+      screenToWorld(vec, canvasDisplaySize, this.camera.position, scale);
+
+    const before = screenToWorldLocal(screenPoint, this.camera.scale);
+
+    const newScale = clamp(
+      this.camera.scale * zoomFactor,
+      this.minScale,
+      this.maxScale
     );
     this.camera.scale = newScale;
 
-    const after = screenToWorld(
-      screenPoint,
-      canvasDisplaySize,
-      this.camera.position,
-      this.camera.scale
-    );
+    const after = screenToWorldLocal(screenPoint, this.camera.scale);
 
     // ズーム前後で screenPoint に対応する世界座標が同じになるように、
     // カメラ位置を補正する

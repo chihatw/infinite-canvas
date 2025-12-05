@@ -5,6 +5,103 @@ import { useEffect, useRef } from 'react';
 import { CanvasEngine } from '../lib/canvas-engine';
 import { Vec2 } from '../lib/vec2';
 
+function setupResize(canvas: HTMLCanvasElement, engine: CanvasEngine) {
+  const handleResize = () => {
+    engine.resize();
+  };
+
+  window.addEventListener('resize', handleResize);
+  handleResize(); // 初回
+
+  return () => {
+    window.removeEventListener('resize', handleResize);
+  };
+}
+
+function setupPanHandlers(canvas: HTMLCanvasElement, engine: CanvasEngine) {
+  let isPanning = false;
+  let lastPointerPos: Vec2 | null = null;
+
+  const handlePointerDown = (e: PointerEvent) => {
+    if (e.button !== 0) return; // 左クリックのみ
+    isPanning = true;
+    lastPointerPos = new Vec2(e.clientX, e.clientY);
+    canvas.setPointerCapture(e.pointerId); // ポインターと要素をひもづけ。ポインターが要素を外れても紐付けを解除しない
+  };
+
+  const handlePointerMove = (e: PointerEvent) => {
+    if (!isPanning || !lastPointerPos) return;
+    const current = new Vec2(e.clientX, e.clientY);
+    const deltaScreen = current.sub(lastPointerPos);
+    lastPointerPos = current;
+
+    engine.panByScreenDelta(deltaScreen);
+  };
+
+  const endPan = (e?: PointerEvent) => {
+    isPanning = false;
+    lastPointerPos = null;
+    if (e) {
+      canvas.releasePointerCapture(e.pointerId); // ポインターと要素の紐付けを解除
+    }
+  };
+
+  const handlePointerUp = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    endPan(e);
+  };
+
+  const handlePointerLeave = () => {
+    endPan();
+  };
+
+  canvas.addEventListener('pointerdown', handlePointerDown);
+  canvas.addEventListener('pointermove', handlePointerMove);
+  canvas.addEventListener('pointerup', handlePointerUp);
+  canvas.addEventListener('pointerleave', handlePointerLeave);
+
+  return () => {
+    canvas.removeEventListener('pointerdown', handlePointerDown);
+    canvas.removeEventListener('pointermove', handlePointerMove);
+    canvas.removeEventListener('pointerup', handlePointerUp);
+    canvas.removeEventListener('pointerleave', handlePointerLeave);
+  };
+}
+
+function setupZoomHandlers(canvas: HTMLCanvasElement, engine: CanvasEngine) {
+  const handleWheel = (e: WheelEvent) => {
+    e.preventDefault(); // 通常の画面スクロールをさせない
+
+    const canvasRect = canvas.getBoundingClientRect();
+
+    const pointerScreenPos = new Vec2(e.clientX, e.clientY);
+    const canvasScreenOrigin = new Vec2(canvasRect.left, canvasRect.top);
+    const localScreenPos = pointerScreenPos.sub(canvasScreenOrigin);
+
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9; // 拡大動作をしたら １．１ 倍、縮小動作をしたら ０.9 倍
+    engine.zoomAtScreenPoint(localScreenPos, zoomFactor);
+  };
+
+  canvas.addEventListener('wheel', handleWheel, { passive: false }); // e.preventDefault(); を有効にする
+  return () => {
+    canvas.removeEventListener('wheel', handleWheel);
+  };
+}
+
+function startRenderLoop(engine: CanvasEngine) {
+  let frameId: number;
+
+  const loop = () => {
+    engine.drawFrame();
+    frameId = requestAnimationFrame(loop);
+  };
+  frameId = requestAnimationFrame(loop);
+
+  return () => {
+    cancelAnimationFrame(frameId);
+  };
+}
+
 export default function Page() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -24,79 +121,17 @@ export default function Page() {
       },
     ]);
 
-    const handleResize = () => {
-      engine.resize();
-    };
-
-    window.addEventListener('resize', handleResize);
-    handleResize();
-
-    // ===== パン操作（ドラッグ） =====
-    let isPanning = false;
-    let lastPointerPos: Vec2 | null = null;
-
-    const handlePointerDown = (e: PointerEvent) => {
-      if (e.button !== 0) return; // 左クリックのみ
-      isPanning = true;
-      lastPointerPos = new Vec2(e.clientX, e.clientY);
-      canvas.setPointerCapture(e.pointerId); // ドラッグ中にポインターが要素外に出ても関係を切断しない
-    };
-
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!isPanning || !lastPointerPos) return;
-      const current = new Vec2(e.clientX, e.clientY);
-      const deltaScreen = current.sub(lastPointerPos);
-      lastPointerPos = current;
-
-      engine.panByScreenDelta(deltaScreen);
-    };
-
-    const handlePointerUp = (e: PointerEvent) => {
-      if (e.button !== 0) return;
-      isPanning = false;
-      lastPointerPos = null;
-      canvas.releasePointerCapture(e.pointerId); // ポインターと要素の関係を切断
-    };
-
-    const handlePointerLeave = () => {
-      isPanning = false;
-      lastPointerPos = null;
-    };
-
-    // ===== ホイールズーム =====
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-
-      const rect = canvas.getBoundingClientRect();
-      const localPoint = new Vec2(e.clientX - rect.left, e.clientY - rect.top);
-
-      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-      engine.zoomAtScreenPoint(localPoint, zoomFactor);
-    };
-
-    canvas.addEventListener('pointerdown', handlePointerDown);
-    canvas.addEventListener('pointermove', handlePointerMove);
-    canvas.addEventListener('pointerup', handlePointerUp);
-    canvas.addEventListener('pointerleave', handlePointerLeave);
-    canvas.addEventListener('wheel', handleWheel, { passive: false });
-
-    // ===== rAF 描画ループ =====
-    let frameId: number;
-
-    const loop = () => {
-      engine.drawFrame();
-      frameId = requestAnimationFrame(loop);
-    };
-    frameId = requestAnimationFrame(loop);
+    // 各機能をセットアップ
+    const cleanupResize = setupResize(canvas, engine);
+    const cleanupPan = setupPanHandlers(canvas, engine);
+    const cleanupZoom = setupZoomHandlers(canvas, engine);
+    const cleanupLoop = startRenderLoop(engine);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
-      canvas.removeEventListener('pointerdown', handlePointerDown);
-      canvas.removeEventListener('pointermove', handlePointerMove);
-      canvas.removeEventListener('pointerup', handlePointerUp);
-      canvas.removeEventListener('pointerleave', handlePointerLeave);
-      canvas.removeEventListener('wheel', handleWheel);
-      cancelAnimationFrame(frameId);
+      cleanupResize();
+      cleanupPan();
+      cleanupZoom();
+      cleanupLoop();
     };
   }, []);
 
