@@ -19,6 +19,7 @@ export class NodeEllipseLayer implements Layer {
   private nodes: NodeEllipse[] = [];
 
   private selectedNodeId: string | null = null;
+  private hoveredNodeId: string | null = null;
 
   constructor(
     private fillStyle = 'white',
@@ -85,6 +86,15 @@ export class NodeEllipseLayer implements Layer {
     return this.nodes.find((n) => n.id === this.selectedNodeId) ?? null;
   }
 
+  setHoveredNode(id: string | null) {
+    this.hoveredNodeId = id;
+  }
+
+  getHoveredNode(): NodeEllipse | null {
+    if (!this.hoveredNodeId) return null;
+    return this.nodes.find((n) => n.id === this.hoveredNodeId) ?? null;
+  }
+
   // 例：クリック判定用（今後の移動・選択に使える）
   hitTest(
     screenPoint: Vec2,
@@ -119,6 +129,7 @@ export class NodeEllipseLayer implements Layer {
       const radiusScreen = node.radius.scale(camera.scale);
 
       const isSelected = node.id === this.selectedNodeId;
+      const isHovered = node.id === this.hoveredNodeId;
 
       ctx.save();
 
@@ -133,10 +144,25 @@ export class NodeEllipseLayer implements Layer {
         0,
         Math.PI * 2
       );
-      ctx.fillStyle = this.fillStyle;
 
-      ctx.strokeStyle = isSelected ? '#2563eb' : this.strokeStyle; // blue-600
-      ctx.lineWidth = isSelected ? this.lineWidth * 1.5 : this.lineWidth;
+      // 状態に応じたスタイル決定
+      let fillStyle = this.fillStyle;
+      let strokeStyle = this.strokeStyle;
+      let lineWidth = this.lineWidth;
+
+      if (isSelected) {
+        // 選択中: しっかり青くハイライト
+        strokeStyle = '#2563eb'; // blue-600
+        lineWidth = this.lineWidth * 1.8;
+      } else if (isHovered) {
+        // ホバー中: 塗りに色 & 太めの枠
+        fillStyle = '#f3f4f6'; // gray-100
+        lineWidth = this.lineWidth * 1.6;
+      }
+
+      ctx.fillStyle = fillStyle;
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = lineWidth;
 
       ctx.fill();
       ctx.stroke();

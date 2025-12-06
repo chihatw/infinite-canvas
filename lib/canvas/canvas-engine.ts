@@ -131,6 +131,11 @@ export class CanvasEngine {
     return this.nodeLayer.hitTest(screenPoint, this.camera, canvasDisplaySize);
   }
 
+  hoverNode(id: string | null) {
+    this.nodeLayer.setHoveredNode(id);
+    this.requestDraw();
+  }
+
   /**
    * ノードの選択状態を設定。
    */

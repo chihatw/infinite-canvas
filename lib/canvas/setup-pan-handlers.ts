@@ -21,13 +21,23 @@ export function setupPanHandlers(
   let lastDragPointerPos: Vec2 | null = null;
   let draggingNodeId: string | null = null;
 
+  const getPointerLocal = (
+    e: PointerEvent
+  ): { pointerClient: Vec2; pointerLocal: Vec2 } => {
+    const canvasRect = canvas.getBoundingClientRect();
+    const canvasOrigin = new Vec2(canvasRect.left, canvasRect.top);
+    const pointerClient = new Vec2(e.clientX, e.clientY);
+    const pointerLocal = pointerClient.sub(canvasOrigin);
+    return { pointerClient, pointerLocal };
+  };
+
   const handlePointerDown = (e: PointerEvent) => {
     if (e.button !== 0) return; // 左クリックのみ
 
     const canvasRect = canvas.getBoundingClientRect();
+    const canvasOrigin = new Vec2(canvasRect.left, canvasRect.top);
 
     const pointerClient = new Vec2(e.clientX, e.clientY);
-    const canvasOrigin = new Vec2(canvasRect.left, canvasRect.top);
     const pointerLocal = pointerClient.sub(canvasOrigin);
 
     // まずノードのヒットテスト
@@ -50,13 +60,22 @@ export function setupPanHandlers(
   };
 
   const handlePointerMove = (e: PointerEvent) => {
-    if (mode === 'drag-node' && draggingNodeId && lastDragPointerPos) {
-      const canvasRect = canvas.getBoundingClientRect();
-      const pointerLocal = new Vec2(
-        e.clientX - canvasRect.left,
-        e.clientY - canvasRect.top
-      );
+    const { pointerClient, pointerLocal } = getPointerLocal(e);
 
+    // ---- ホバー判定（ボタン未押下時のみ）----
+    if (e.buttons === 0) {
+      const hitNode = engine.hitTestNodeAtScreenPoint(pointerLocal);
+      if (hitNode) {
+        engine.hoverNode(hitNode.id);
+        canvas.style.cursor = 'pointer';
+      } else {
+        engine.hoverNode(null);
+        canvas.style.cursor = 'default';
+      }
+    }
+
+    // ---- ドラッグ中の処理 ----
+    if (mode === 'drag-node' && draggingNodeId && lastDragPointerPos) {
       const deltaScreen = pointerLocal.sub(lastDragPointerPos);
       lastDragPointerPos = pointerLocal;
 
@@ -66,9 +85,8 @@ export function setupPanHandlers(
     }
 
     if (mode === 'panning' && lastPanPointerPos) {
-      const current = new Vec2(e.clientX, e.clientY);
-      const deltaScreen = current.sub(lastPanPointerPos);
-      lastPanPointerPos = current;
+      const deltaScreen = pointerClient.sub(lastPanPointerPos);
+      lastPanPointerPos = pointerClient;
 
       engine.panByScreenDelta(deltaScreen);
       return;
@@ -94,6 +112,9 @@ export function setupPanHandlers(
   };
 
   const handlePointerLeave = (e: PointerEvent) => {
+    // キャンバス外に出たらホバー解除 & インタラクション終了
+    engine.hoverNode(null);
+    canvas.style.cursor = 'default';
     endInteraction(e);
   };
 
