@@ -1,17 +1,16 @@
 // lib/canvas-engine.ts
-import { GridLayer } from './grid-layer';
-import { NodeEllipseLayer } from './node-ellipse-layer';
-import { Camera, DisplaySize, Layer, NodeEllipse } from './types';
-import { screenToWorld } from './utils';
-import { Vec2 } from './vec2';
+import { NodeEllipseLayer } from '../layers/node-ellipse-layer';
 
-function getCanvasDisplaySize(canvas: HTMLCanvasElement): DisplaySize {
-  const rect = canvas.getBoundingClientRect();
-  return {
-    width: rect.width,
-    height: rect.height,
-  };
-}
+import { GridLayer } from './grid-layer';
+
+import { Vec2 } from '../math/vec2';
+import { Camera } from '../types/camera';
+import { DisplaySize } from '../types/display-size';
+import { Layer } from '../types/layer';
+import { NodeEllipse } from '../types/node-ellipse';
+import { getCanvasDisplaySize } from './utils/canvas-size';
+import { clamp } from './utils/clamp';
+import { screenToWorld } from './utils/coordinate';
 
 /**
  * CSS表示サイズをもとに canvas の内部ピクセルサイズを設定する（DPR考慮）
@@ -54,10 +53,6 @@ function drawBackground(
   ctx.fillStyle = color;
   ctx.fillRect(0, 0, canvasDisplaySize.width, canvasDisplaySize.height);
   ctx.restore();
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
 
 export class CanvasEngine {
@@ -125,6 +120,32 @@ export class CanvasEngine {
 
   setNodeLabel(id: string, label: string) {
     this.nodeLayer.setLabel(id, label);
+    this.requestDraw();
+  }
+
+  /**
+   * 画面(canvas 内)座標でのヒットテスト。
+   */
+  hitTestNodeAtScreenPoint(screenPoint: Vec2): NodeEllipse | null {
+    const canvasDisplaySize = getCanvasDisplaySize(this.canvas);
+    return this.nodeLayer.hitTest(screenPoint, this.camera, canvasDisplaySize);
+  }
+
+  /**
+   * ノードの選択状態を設定。
+   */
+  selectNode(id: string | null) {
+    this.nodeLayer.setSelectedNode(id);
+    this.requestDraw();
+  }
+
+  /**
+   * 画面座標系での移動量から、ノードを移動する。
+   * （パンと同じく screenDelta / scale で世界座標に変換）
+   */
+  moveNodeByScreenDelta(id: string, screenDelta: Vec2) {
+    const worldDelta = screenDelta.scale(1 / this.camera.scale);
+    this.nodeLayer.moveNode(id, worldDelta);
     this.requestDraw();
   }
 

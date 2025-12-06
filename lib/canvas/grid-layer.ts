@@ -1,6 +1,11 @@
-import { Camera, DisplaySize, Layer } from './types';
-import { roundDownToMultiple, screenToWorld, worldToScreen } from './utils';
-import { Vec2 } from './vec2';
+import { roundDownToMultiple } from '../math/round';
+import { Vec2 } from '../math/vec2';
+
+import { Camera } from '../types/camera';
+import { DisplaySize } from '../types/display-size';
+import { Layer } from '../types/layer';
+
+import { screenToWorld, worldToScreen } from './utils/coordinate';
 
 type WorldRect = {
   left: number;

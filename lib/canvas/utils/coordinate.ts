@@ -1,4 +1,4 @@
-import { Vec2 } from './vec2';
+import { Vec2 } from '@/lib/math/vec2';
 
 // 世界座標 → 画面座標 に変換
 export function worldToScreen(
@@ -36,10 +36,4 @@ export function screenToWorld(
   const unscaled = relative.scale(1 / cameraScale);
 
   return cameraPos.add(unscaled);
-}
-
-// step 単位に丸める
-// roundDownToMultiple(540, 100) = 500
-export function roundDownToMultiple(value: number, step: number): number {
-  return Math.floor(value / step) * step;
 }

@@ -1,10 +1,24 @@
 // lib/node-ellipse-layer.ts
-import { Camera, DisplaySize, Layer, NodeEllipse } from './types';
-import { worldToScreen } from './utils';
-import { Vec2 } from './vec2';
+import { worldToScreen } from '../canvas/utils/coordinate';
+
+import { Vec2 } from '../math/vec2';
+import { Camera } from '../types/camera';
+import { DisplaySize } from '../types/display-size';
+import { Layer } from '../types/layer';
+import { NodeEllipse } from '../types/node-ellipse';
+
+function isInsideEllipse(point: Vec2, radius: Vec2): boolean {
+  return (
+    (point.x * point.x) / (radius.x * radius.x) +
+      (point.y * point.y) / (radius.y * radius.y) <=
+    1
+  );
+}
 
 export class NodeEllipseLayer implements Layer {
   private nodes: NodeEllipse[] = [];
+
+  private selectedNodeId: string | null = null;
 
   constructor(
     private fillStyle = 'white',
@@ -62,31 +76,32 @@ export class NodeEllipseLayer implements Layer {
     this.nodes[idx] = { ...node, label };
   }
 
+  setSelectedNode(id: string | null) {
+    this.selectedNodeId = id;
+  }
+
+  getSelectedNode(): NodeEllipse | null {
+    if (!this.selectedNodeId) return null;
+    return this.nodes.find((n) => n.id === this.selectedNodeId) ?? null;
+  }
+
   // 例：クリック判定用（今後の移動・選択に使える）
   hitTest(
     screenPoint: Vec2,
     camera: Camera,
     canvasSize: DisplaySize
   ): NodeEllipse | null {
-    // 画面座標 → 世界座標に変換してもよいし、
-    // ここでは世界→画面を使ったほうが直感的なら、各ノードを screen に投影して判定してもよい
+    const worldToScreenLocal = (vec: Vec2) =>
+      worldToScreen(vec, canvasSize, camera.position, camera.scale);
+
     for (const node of this.nodes) {
-      const centerScreen = worldToScreen(
-        node.center,
-        canvasSize,
-        camera.position,
-        camera.scale
-      );
-      const rx = node.radius.x * camera.scale;
-      const ry = node.radius.y * camera.scale;
+      // 各ノードの中心のスクリーン座標とスクリーン上での半径を算出
+      const centerScreen = worldToScreenLocal(node.center);
 
-      const dx = screenPoint.x - centerScreen.x;
-      const dy = screenPoint.y - centerScreen.y;
+      const diff = screenPoint.sub(centerScreen);
+      const radiusScreen = node.radius.scale(camera.scale);
 
-      // 楕円内判定: (x/rx)^2 + (y/ry)^2 <= 1
-      if ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1) {
-        return node;
-      }
+      if (isInsideEllipse(diff, radiusScreen)) return node;
     }
     return null;
   }
@@ -97,23 +112,32 @@ export class NodeEllipseLayer implements Layer {
     if (width <= 0 || height <= 0) return;
 
     for (const node of this.nodes) {
-      const centerScreen = worldToScreen(
-        node.center,
-        canvasSize,
-        camera.position,
-        camera.scale
-      );
-      const rx = node.radius.x * camera.scale;
-      const ry = node.radius.y * camera.scale;
+      const worldToScreenLocal = (vec: Vec2) =>
+        worldToScreen(vec, canvasSize, camera.position, camera.scale);
+
+      const centerScreen = worldToScreenLocal(node.center);
+      const radiusScreen = node.radius.scale(camera.scale);
+
+      const isSelected = node.id === this.selectedNodeId;
 
       ctx.save();
 
       // 楕円本体
       ctx.beginPath();
-      ctx.ellipse(centerScreen.x, centerScreen.y, rx, ry, 0, 0, Math.PI * 2);
+      ctx.ellipse(
+        centerScreen.x,
+        centerScreen.y,
+        radiusScreen.x,
+        radiusScreen.y,
+        0,
+        0,
+        Math.PI * 2
+      );
       ctx.fillStyle = this.fillStyle;
-      ctx.strokeStyle = this.strokeStyle;
-      ctx.lineWidth = this.lineWidth;
+
+      ctx.strokeStyle = isSelected ? '#2563eb' : this.strokeStyle; // blue-600
+      ctx.lineWidth = isSelected ? this.lineWidth * 1.5 : this.lineWidth;
+
       ctx.fill();
       ctx.stroke();
 
