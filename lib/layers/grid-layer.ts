@@ -5,7 +5,7 @@ import { Camera } from '../types/camera';
 import { DisplaySize } from '../types/display-size';
 import { Layer } from '../types/layer';
 
-import { screenToWorld, worldToScreen } from './utils/coordinate';
+import { screenToWorld, worldToScreen } from '../canvas/utils/coordinate';
 
 type WorldRect = {
   left: number;

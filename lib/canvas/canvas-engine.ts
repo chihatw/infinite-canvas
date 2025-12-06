@@ -1,7 +1,7 @@
 // lib/canvas-engine.ts
 import { NodeEllipseLayer } from '../layers/node-ellipse-layer';
 
-import { GridLayer } from './grid-layer';
+import { GridLayer } from '../layers/grid-layer';
 
 import { Vec2 } from '../math/vec2';
 import { Camera } from '../types/camera';
