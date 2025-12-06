@@ -27,10 +27,8 @@ export function setupPanHandlers(
     const canvasRect = canvas.getBoundingClientRect();
 
     const pointerClient = new Vec2(e.clientX, e.clientY);
-    const pointerLocal = new Vec2(
-      e.clientX - canvasRect.left,
-      e.clientY - canvasRect.top
-    );
+    const canvasOrigin = new Vec2(canvasRect.left, canvasRect.top);
+    const pointerLocal = pointerClient.sub(canvasOrigin);
 
     // まずノードのヒットテスト
     const hitNode = engine.hitTestNodeAtScreenPoint(pointerLocal);
@@ -46,9 +44,6 @@ export function setupPanHandlers(
       // 背景ドラッグ → パン
       mode = 'panning';
       lastPanPointerPos = pointerClient;
-
-      // 背景クリックしたなら選択解除
-      engine.selectNode(null);
     }
 
     canvas.setPointerCapture(e.pointerId);
@@ -85,6 +80,9 @@ export function setupPanHandlers(
     lastPanPointerPos = null;
     lastDragPointerPos = null;
     draggingNodeId = null;
+
+    // ドラッグが終わったら必ず選択解除
+    engine.selectNode(null);
 
     if (e) {
       canvas.releasePointerCapture(e.pointerId);
